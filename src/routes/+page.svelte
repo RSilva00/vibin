@@ -1,52 +1,114 @@
 <script>
-  import { debounce } from 'lodash';
-
-  let message = '';
-  let searchQuery = '';
-  let results = [];
-  let error = null;
-
-  // Carga el mensaje inicial del backend
-  async function fetchMessage() {
-    try {
-      const response = await fetch('http://localhost:3001/api');
-      const data = await response.json();
-      message = data.message;
-    } catch (err) {
-      console.error('Error al obtener el mensaje del backend:', err.message);
-    }
-  }
-
-  fetchMessage();
-
-  // Función para buscar artistas
-  const searchArtists = async () => {
-    if (!searchQuery.trim()) {
-      results = [];
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:3001/api/search-artists?query=${searchQuery}`);
-      if (!response.ok) {
-        throw new Error('Error en la búsqueda');
+    import lodash from 'lodash'; // Cambiado a la importación por defecto
+    const { debounce } = lodash; // Obtener debounce desde lodash
+  
+    let message = '';
+    let searchQuery = '';
+    let results = [];
+    let error = null;
+  
+    // Carga el mensaje inicial del backend
+    async function fetchMessage() {
+      try {
+        const response = await fetch('http://localhost:5000/api');
+        const data = await response.json();
+        message = data.message;
+      } catch (err) {
+        console.error('Error al obtener el mensaje del backend:', err.message);
       }
-      results = await response.json();
-    } catch (err) {
-      error = err.message;
+    }
+  
+    fetchMessage();
+  
+    // Función para buscar artistas
+    const searchArtists = async () => {
+      if (!searchQuery.trim()) {
+        results = [];
+        return;
+      }
+  
+      try {
+        const response = await fetch(`http://localhost:5000/api/search-artists?query=${searchQuery}`);
+        if (!response.ok) {
+          throw new Error('Error en la búsqueda');
+        }
+        results = await response.json();
+      } catch (err) {
+        error = err.message;
+      }
+    };
+  
+    // Función de búsqueda dinámica con debounce
+    const debouncedSearch = debounce(() => {
+      searchArtists();
+    }, 500); // Retraso de 500ms para el debounce
+  
+    // Ejecutar búsqueda cada vez que cambie `searchQuery`
+    $: debouncedSearch(searchQuery);
+  
+  let name = '';
+  let email = '';
+  let password = '';
+  let errorMessage = '';
+  let successMessage = '';
+
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al registrar el usuario');
+      }
+
+      successMessage = data.message;
+      name = '';
+      email = '';
+      password = '';
+      errorMessage = '';
+    } catch (error) {
+      errorMessage = error.message;
+      successMessage = '';
     }
   };
-
-  // Función de búsqueda dinámica con debounce
-  const debouncedSearch = debounce(() => {
-    searchArtists();
-  }, 300);
-
-  // Ejecutar búsqueda cada vez que cambie `searchQuery`
-  $: debouncedSearch(searchQuery);
 </script>
 
+
+<h2>Registro de Usuario</h2>
+
+{#if errorMessage}
+  <p class="error">{errorMessage}</p>
+  {/if}
+  
+  {#if successMessage}
+  <p class="success">{successMessage}</p>
+  {/if}
+  
+  <form on:submit|preventDefault={handleSubmit}>
+  <label for="name">Nombre</label>
+  <input type="text" id="name" bind:value={name} required />
+
+  <label for="email">Correo electrónico</label>
+  <input type="email" id="email" bind:value={email} required />
+
+  <label for="password">Contraseña</label>
+  <input type="password" id="password" bind:value={password} required />
+
+  <button type="submit">Registrar</button>
+</form>
+
+
+
 <style>
+
+    .error { color: red; }
+    .success { color: green; }
+    
   .error {
     color: red;
   }
