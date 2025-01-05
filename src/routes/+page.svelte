@@ -45,64 +45,18 @@
   
     // Ejecutar búsqueda cada vez que cambie `searchQuery`
     $: debouncedSearch(searchQuery);
-  
-  let name = '';
-  let email = '';
-  let password = '';
-  let errorMessage = '';
-  let successMessage = '';
 
-  const handleSubmit = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
+    import Header from '$lib/components/Header.svelte';
 
-      const data = await response.json();
+    let isAuthenticated = false;
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al registrar el usuario');
-      }
-
-      successMessage = data.message;
-      name = '';
-      email = '';
-      password = '';
-      errorMessage = '';
-    } catch (error) {
-      errorMessage = error.message;
-      successMessage = '';
+    // Verificar si el usuario está autenticado
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('token');
+        isAuthenticated = !!token;
     }
-  };
+  
 </script>
-
-
-<h2>Registro de Usuario</h2>
-
-{#if errorMessage}
-  <p class="error">{errorMessage}</p>
-  {/if}
-  
-  {#if successMessage}
-  <p class="success">{successMessage}</p>
-  {/if}
-  
-  <form on:submit|preventDefault={handleSubmit}>
-  <label for="name">Nombre</label>
-  <input type="text" id="name" bind:value={name} required />
-
-  <label for="email">Correo electrónico</label>
-  <input type="email" id="email" bind:value={email} required />
-
-  <label for="password">Contraseña</label>
-  <input type="password" id="password" bind:value={password} required />
-
-  <button type="submit">Registrar</button>
-</form>
-
-
 
 <style>
 
@@ -163,6 +117,17 @@
     color: #555;
   }
 </style>
+
+<Header {isAuthenticated} />
+
+<main style="padding: 2rem;">
+    <h1>Bienvenido a la Página Principal</h1>
+    {#if isAuthenticated}
+        <p>Ya estás autenticado. Accede a las funcionalidades protegidas.</p>
+    {:else}
+        <p>Por favor, <a href="/login">inicia sesión</a> o <a href="/register">regístrate</a> para continuar.</p>
+    {/if}
+</main>
 
 <main>
   <h1>Conexión SvelteKit y Node.js</h1>
