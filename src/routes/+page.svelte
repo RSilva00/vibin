@@ -20,31 +20,53 @@
   
     fetchMessage();
   
-    // Función para buscar artistas
-    const searchArtists = async () => {
-      if (!searchQuery.trim()) {
-        results = [];
-        return;
+  let selectedArtist = null;
+  let topTracks = [];
+
+  // Función para buscar artistas
+  const searchArtists = async () => {
+    if (!searchQuery.trim()) {
+      results = [];
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/search-artists?query=${searchQuery}`);
+      if (!response.ok) {
+        throw new Error('Error en la búsqueda');
       }
-  
-      try {
-        const response = await fetch(`http://localhost:5000/api/search-artists?query=${searchQuery}`);
-        if (!response.ok) {
-          throw new Error('Error en la búsqueda');
-        }
-        results = await response.json();
-      } catch (err) {
-        error = err.message;
+      results = await response.json();
+    } catch (err) {
+      error = err.message;
+    }
+  };
+
+  // Función para obtener las 10 canciones principales de un artista
+  const getTopTracks = async (artistId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/artist-top-tracks/${artistId}`);
+      if (!response.ok) {
+        throw new Error('Error al obtener canciones');
       }
-    };
-  
-    // Función de búsqueda dinámica con debounce
-    const debouncedSearch = debounce(() => {
-      searchArtists();
-    }, 500); // Retraso de 500ms para el debounce
-  
-    // Ejecutar búsqueda cada vez que cambie `searchQuery`
-    $: debouncedSearch(searchQuery);
+      topTracks = await response.json();
+    } catch (err) {
+      error = err.message;
+    }
+  };
+
+  // Función de búsqueda dinámica con debounce
+  const debouncedSearch = debounce(() => {
+    searchArtists();
+  }, 500); // Retraso de 500ms para el debounce
+
+  // Ejecutar búsqueda cada vez que cambie `searchQuery`
+  $: debouncedSearch(searchQuery);
+
+  // Función para manejar la selección de un artista
+  const handleArtistClick = (artistId) => {
+    selectedArtist = results.find(artist => artist.id === artistId);
+    getTopTracks(artistId);
+  };
 
     import Header from '$lib/components/Header.svelte';
 
@@ -56,16 +78,18 @@
         isAuthenticated = !!token;
     }
   
+// Función para reproducir la canción seleccionada
+  const playTrack = (previewUrl) => {
+    const audio = new Audio(previewUrl);
+    audio.play();
+  };
+
 </script>
-
 <style>
-
-    .error { color: red; }
-    .success { color: green; }
-    
-  .error {
-    color: red;
-  }
+  .error { color: red; }
+  .success { color: green; }
+  
+  .error { color: red; }
 
   .search-input {
     width: 100%;
@@ -116,6 +140,154 @@
     font-size: 14px;
     color: #555;
   }
+
+  .track-list {
+    margin-top: 20px;
+  }
+
+  .track-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .track-item button {
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .track-item button:hover {
+    background-color: #0056b3;
+  }
+
+  .artist-card {
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+
+  .artist-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .artist-card img {
+    width: 100%;
+    height: auto;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .artist-info {
+    padding: 10px;
+  }
+
+  .artist-name {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  .artist-fans {
+    font-size: 14px;
+    color: #555;
+  }
+
+  .error { color: red; }
+  .success { color: green; }
+  
+  .error { color: red; }
+
+  .search-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    font-size: 16px;
+  }
+
+  .results-container {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+
+  .artist-card {
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    overflow: hidden;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+
+  .artist-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  .artist-card img {
+    width: 100%;
+    height: auto;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .artist-info {
+    padding: 10px;
+  }
+
+  .artist-name {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #333;
+  }
+
+  .artist-fans {
+    font-size: 14px;
+    color: #555;
+  }
+
+  .track-list {
+    margin-top: 20px;
+  }
+
+  .track-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .track-item button {
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .track-item button:hover {
+    background-color: #0056b3;
+  }
+
+  .track-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 5px;
+  }
+
 </style>
 
 <Header {isAuthenticated} />
@@ -148,7 +320,7 @@
     {#if results.length > 0}
       <div class="results-container">
         {#each results as artist}
-          <div class="artist-card">
+          <div class="artist-card" on:click={() => handleArtistClick(artist.id)}>
             <img src={artist.picture_medium || '/placeholder.jpg'} alt={artist.name} />
             <div class="artist-info">
               <div class="artist-name">{artist.name}</div>
@@ -159,6 +331,19 @@
       </div>
     {:else if searchQuery.trim()}
       <p>No hay resultados</p>
+    {/if}
+
+    {#if selectedArtist}
+      <h2>{selectedArtist.name} - Top 10 Canciones</h2>
+      <div class="track-list">
+        {#each topTracks as track}
+          <div class="track-item">
+            <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
+            <div>{track.title}</div>
+            <button on:click={() => playTrack(track.preview)}>Reproducir</button>
+          </div>
+        {/each}
+      </div>
     {/if}
   </div>
 </main>
