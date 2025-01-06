@@ -19,6 +19,43 @@
     }
   
     fetchMessage();
+ let tracks = [];
+  let currentIndex = 0;
+  const tracksPerPage = 5;
+  let loading = true;
+
+  async function loadTracks() {
+    try {
+      const response = await fetch('http://localhost:5000/api/latest-tracks');
+      if (!response.ok) {
+        throw new Error('No se pudo obtener las canciones');
+      }
+      const data = await response.json();
+      tracks = data.data;
+      console.log("Tracks:", tracks);
+
+      // Establecer un carrusel automático
+      setInterval(() => {
+        currentIndex = (currentIndex + 1) % Math.ceil(tracks.length / tracksPerPage);
+      }, 3000);
+
+      loading = false;
+    } catch (err) {
+      console.error('Error al obtener las canciones:', err.message);
+      loading = false;
+    }
+  }
+
+  loadTracks();
+
+  // Función para dividir canciones en grupos de 5
+  function chunkTracks(tracks, size) {
+    const chunks = [];
+    for (let i = 0; i < tracks.length; i += size) {
+      chunks.push(tracks.slice(i, i + size));
+    }
+    return chunks;
+  }
   
   let selectedArtist = null;
   let topTracks = [];
@@ -86,207 +123,156 @@
 
 </script>
 <style>
-  .error { color: red; }
-  .success { color: green; }
-  
-  .error { color: red; }
-
-  .search-input {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
-    font-size: 16px;
-  }
-
-  .results-container {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-  }
-
-  .artist-card {
-    background-color: #f9f9f9;
-    border: 1px solid #ccc;
-    border-radius: 10px;
+.carousel-container {
+    position: relative;
+    width: 50rem;
     overflow: hidden;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
   }
 
-  .artist-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  }
-
-  .artist-card img {
-    width: 100%;
-    height: auto;
-    border-bottom: 1px solid #ccc;
-  }
-
-  .artist-info {
-    padding: 10px;
-  }
-
-  .artist-name {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-  }
-
-  .artist-fans {
-    font-size: 14px;
-    color: #555;
-  }
-
-  .track-list {
-    margin-top: 20px;
-  }
-
-  .track-item {
+  .carousel {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    transition: transform 0.5s ease;
   }
 
-  .track-item button {
-    padding: 5px 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+  .carousel-item {
+    min-width: 100%;
+    box-sizing: border-box;
+    padding: 20px;
   }
 
-  .track-item button:hover {
-    background-color: #0056b3;
-  }
-
-  .artist-card {
-    background-color: #f9f9f9;
-    border: 1px solid #ccc;
+  .carousel-item img {
+    width: 100%;
     border-radius: 10px;
-    overflow: hidden;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: pointer;
   }
 
-  .artist-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .artist-card img {
-    width: 100%;
-    height: auto;
-    border-bottom: 1px solid #ccc;
-  }
-
-  .artist-info {
-    padding: 10px;
-  }
-
-  .artist-name {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-  }
-
-  .artist-fans {
-    font-size: 14px;
-    color: #555;
-  }
-
-  .error { color: red; }
-  .success { color: green; }
-  
-  .error { color: red; }
-
-  .search-input {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 20px;
-    font-size: 16px;
-  }
-
-  .results-container {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
-  }
-
-  .artist-card {
-    background-color: #f9f9f9;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    overflow: hidden;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    cursor: pointer;
-  }
-
-  .artist-card:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-
-  .artist-card img {
-    width: 100%;
-    height: auto;
-    border-bottom: 1px solid #ccc;
-  }
-
-  .artist-info {
-    padding: 10px;
-  }
-
-  .artist-name {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-  }
-
-  .artist-fans {
-    font-size: 14px;
-    color: #555;
-  }
-
-  .track-list {
-    margin-top: 20px;
-  }
-
-  .track-item {
+  .carousel-indicators {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    justify-content: center;
+    gap: 5px;
   }
 
-  .track-item button {
-    padding: 5px 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
+  .indicator {
+    background-color: white;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
     cursor: pointer;
+    opacity: 0.7;
   }
 
-  .track-item button:hover {
-    background-color: #0056b3;
+  .indicator.active {
+    background-color: #007bff;
   }
 
-  .track-item img {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
+  .skeleton {
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    height: 200px;
+  }
+
+  .skeleton-text {
+    background-color: #e0e0e0;
+    height: 20px;
+    margin-top: 10px;
+    width: 60%;
     border-radius: 5px;
   }
+
+  .skeleton-indicator {
+    background-color: #e0e0e0;
+    height: 10px;
+    width: 10px;
+    margin: 0 5px;
+    border-radius: 50%;
+  }
+
+.error { color: red; }
+.success { color: green; }
+
+.search-input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.results-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.artist-card {
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.artist-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.artist-card img {
+  width: 100%;
+  height: auto;
+  border-bottom: 1px solid #ccc;
+}
+
+.artist-info {
+  padding: 10px;
+}
+
+.artist-name {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.artist-fans {
+  font-size: 14px;
+  color: #555;
+}
+
+.track-list {
+  margin-top: 20px;
+}
+
+.track-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.track-item button {
+  padding: 5px 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.track-item button:hover {
+  background-color: #0056b3;
+}
+
+.track-item img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 5px;
+}
 
 </style>
 
@@ -301,27 +287,28 @@
     {/if}
 </main>
 
+
 <main>
   <h1>Conexión SvelteKit y Node.js</h1>
   <p>{message}</p>
-
+  
   <div>
     <input
-      type="text"
-      bind:value={searchQuery}
-      placeholder="Buscar artistas"
-      class="search-input"
+    type="text"
+    bind:value={searchQuery}
+    placeholder="Buscar artistas"
+    class="search-input"
     />
-
+    
     {#if error}
-      <p class="error">{error}</p>
+    <p class="error">{error}</p>
     {/if}
-
+    
     {#if results.length > 0}
-      <div class="results-container">
-        {#each results as artist}
-          <div class="artist-card" on:click={() => handleArtistClick(artist.id)}>
-            <img src={artist.picture_medium || '/placeholder.jpg'} alt={artist.name} />
+    <div class="results-container">
+      {#each results as artist}
+      <div class="artist-card" on:click={() => handleArtistClick(artist.id)}>
+        <img src={artist.picture_medium || '/placeholder.jpg'} alt={artist.name} />
             <div class="artist-info">
               <div class="artist-name">{artist.name}</div>
               <div class="artist-fans">{artist.nb_fan.toLocaleString()} fans</div>
@@ -329,11 +316,11 @@
           </div>
         {/each}
       </div>
-    {:else if searchQuery.trim()}
+      {:else if searchQuery.trim()}
       <p>No hay resultados</p>
-    {/if}
-
-    {#if selectedArtist}
+      {/if}
+      
+      {#if selectedArtist}
       <h2>{selectedArtist.name} - Top 10 Canciones</h2>
       <div class="track-list">
         {#each topTracks as track}
@@ -341,9 +328,48 @@
             <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
             <div>{track.title}</div>
             <button on:click={() => playTrack(track.preview)}>Reproducir</button>
+            <button on:click={() => console.log(track.id)}>Favoritos</button>
           </div>
-        {/each}
+          {/each}
+        </div>
+        {/if}
       </div>
-    {/if}
-  </div>
-</main>
+    </main>
+
+    <div class="carousel-container">
+      {#if loading}
+        <!-- Skeleton Loader -->
+        <div class="carousel">
+          {#each Array(tracksPerPage) as _}
+            <div class="carousel-item">
+              <div class="skeleton"></div>
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <!-- Carrusel de Canciones -->
+        {#if tracks.length > 0}
+          <div class="carousel" style="transform: translateX(-{currentIndex * 100}%)">
+            {#each chunkTracks(tracks, tracksPerPage) as trackGroup}
+              <div class="carousel-item">
+                {#each trackGroup as track}
+                  <div>
+                    <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
+                    <div>{track.title}</div>
+                  </div>
+                {/each}
+              </div>
+            {/each}
+          </div>
+    
+          <div class="carousel-indicators">
+            {#each Array(Math.ceil(tracks.length / tracksPerPage)) as _, index}
+              <div
+                class="indicator {index === currentIndex ? 'active' : ''}"
+                on:click={() => currentIndex = index}
+              ></div>
+            {/each}
+          </div>
+        {/if}
+      {/if}
+    </div>
