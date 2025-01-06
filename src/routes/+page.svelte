@@ -114,6 +114,64 @@
         const token = localStorage.getItem('token');
         isAuthenticated = !!token;
     }
+
+    let favorites = [];
+
+
+
+ // Obtener los favoritos del usuario
+  const fetchFavorites = async () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const response = await fetch('http://localhost:5000/api/favorites', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+        console.log(data)
+        //favorites = data.favorites.map(fav => fav.id);  // Extraemos solo los ids de los favoritos
+      } catch (err) {
+        console.error("Error al obtener los favoritos:", err);
+      }
+    }
+  };
+
+  if (isAuthenticated) {
+    fetchFavorites();
+  }
+
+  // Función para agregar a favoritos
+  const addToFavorites = async (songId) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const response = await fetch('http://localhost:5000/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ songId }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          favorites.push(songId);  // Agregar el ID de la canción a favoritos
+          alert(data.message);
+        } else {
+          alert(data.error);
+        }
+      } catch (err) {
+        console.error("Error al agregar a favoritos:", err);
+      }
+    } else {
+      alert('Debes iniciar sesión para agregar canciones a favoritos.');
+    }
+  };
   
 // Función para reproducir la canción seleccionada
   const playTrack = (previewUrl) => {
@@ -281,6 +339,7 @@
 <main style="padding: 2rem;">
     <h1>Bienvenido a la Página Principal</h1>
     {#if isAuthenticated}
+    {console.log()}
         <p>Ya estás autenticado. Accede a las funcionalidades protegidas.</p>
     {:else}
         <p>Por favor, <a href="/login">inicia sesión</a> o <a href="/register">regístrate</a> para continuar.</p>
@@ -328,7 +387,9 @@
             <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
             <div>{track.title}</div>
             <button on:click={() => playTrack(track.preview)}>Reproducir</button>
-            <button on:click={() => console.log(track.id)}>Favoritos</button>
+            <button on:click={() => addToFavorites(track.id)}>
+  Favoritos
+</button>
           </div>
           {/each}
         </div>
