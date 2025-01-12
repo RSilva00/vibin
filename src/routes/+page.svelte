@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { favorites, addFavorite, removeFavorite } from '../lib/stores/favorites.js';
     import lodash from 'lodash'; // Cambiado a la importación por defecto
+    import { initializeSession, tokenStatus } from '$lib/services/tokenValidation.js';
     const { debounce } = lodash; // Obtener debounce desde lodash
   
     let message = '';
@@ -145,6 +146,7 @@
 
 
 onMount(() => {
+  initializeSession();
   obtFavorites();
 })
 
