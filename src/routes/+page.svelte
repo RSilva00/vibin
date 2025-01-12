@@ -1,4 +1,6 @@
 <script>
+    import { onMount } from 'svelte';
+    import { favorites, addFavorite, removeFavorite } from '../lib/stores/favorites.js';
     import lodash from 'lodash'; // Cambiado a la importación por defecto
     const { debounce } = lodash; // Obtener debounce desde lodash
   
@@ -115,34 +117,37 @@
         isAuthenticated = !!token;
     }
 
-    let favorites = [];
-
-
-
- // Obtener los favoritos del usuario
-  const fetchFavorites = async () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await fetch('http://localhost:5000/api/favorites', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-        console.log(data)
-        //favorites = data.favorites.map(fav => fav.id);  // Extraemos solo los ids de los favoritos
-      } catch (err) {
-        console.error("Error al obtener los favoritos:", err);
-      }
+    const obtFavorites = async() => {
+        const token = localStorage.getItem('token');
+        console.log("Token:", token);
+        if (token) {
+            try {
+                const response = await fetch('http://localhost:5000/api/getFavorites', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    favorites.set(data.favorites);
+                    console.log("Favoritos:", data.favorites);
+                } else {
+                    console.error(data.error);
+                }
+            } catch (err) {
+                console.error("Error al obtener favoritos:", err);
+            }
+        }
     }
-  };
 
-  if (isAuthenticated) {
-    fetchFavorites();
-  }
+
+
+onMount(() => {
+  obtFavorites();
+})
+
 
   // Función para agregar a favoritos
   const addToFavorites = async (songId) => {
@@ -380,20 +385,28 @@
       {/if}
       
       {#if selectedArtist}
-      <h2>{selectedArtist.name} - Top 10 Canciones</h2>
-      <div class="track-list">
-        {#each topTracks as track}
-          <div class="track-item">
-            <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
-            <div>{track.title}</div>
-            <button on:click={() => playTrack(track.preview)}>Reproducir</button>
-            <button on:click={() => addToFavorites(track.id)}>
-  Favoritos
-</button>
-          </div>
-          {/each}
-        </div>
-        {/if}
+  <h2>{selectedArtist.name} - Top 10 Canciones</h2>
+  <div class="track-list">
+    {#each topTracks as track}
+      <div class="track-item">
+        <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
+        <div>{track.title}</div>
+        <button on:click={() => playTrack(track.preview)}>Reproducir</button>
+
+        {#if $favorites.find(fav => {
+    console.log("Comparando", fav, "con", track.id); 
+    return fav === track.id;
+})}
+    <button on:click={() => removeFavorite(track.id)}>Eliminar de favoritos</button>
+{:else}
+    <button on:click={() => addFavorite(track.id)}>Agregar a favoritos</button>
+{/if}
+
+      </div>
+    {/each}
+  </div>
+{/if}
+
       </div>
     </main>
 
