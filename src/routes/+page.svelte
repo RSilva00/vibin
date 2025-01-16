@@ -35,7 +35,6 @@
       }
       const data = await response.json();
       tracks = data.data;
-      console.log("Tracks:", tracks);
 
       // Establecer un carrusel automático
       setInterval(() => {
@@ -149,36 +148,6 @@ onMount(() => {
   initializeSession();
   obtFavorites();
 })
-
-
-  // Función para agregar a favoritos
-  const addToFavorites = async (songId) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await fetch('http://localhost:5000/api/favorites', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ songId }),
-        });
-
-        const data = await response.json();
-        if (response.ok) {
-          favorites.push(songId);  // Agregar el ID de la canción a favoritos
-          alert(data.message);
-        } else {
-          alert(data.error);
-        }
-      } catch (err) {
-        console.error("Error al agregar a favoritos:", err);
-      }
-    } else {
-      alert('Debes iniciar sesión para agregar canciones a favoritos.');
-    }
-  };
   
 // Función para reproducir la canción seleccionada
   const playTrack = (previewUrl) => {
@@ -187,10 +156,61 @@ onMount(() => {
   };
 
 </script>
+
 <style>
+
+  main {
+        display: grid;
+        grid-template-columns: 20% 1fr 20%;
+        gap: 1rem;
+        padding: 1rem;
+        height: 100%;
+    }
+
+    .sidebar {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+
+    .sidebar h2 {
+        margin-top: 0;
+    }
+
+    .content {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        overflow-y: auto;
+    }
+
+    .content h2 {
+        margin-top: 0;
+    }
+
+    .extra {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+
+    .extra h2 {
+        margin-top: 0;
+    }
+
+    a {
+        color: lightblue;
+        text-decoration: none;
+    }
+
+    a:hover {
+        text-decoration: underline;
+    }
 .carousel-container {
     position: relative;
-    width: 50rem;
+    width: 60rem;
     overflow: hidden;
   }
 
@@ -343,6 +363,35 @@ onMount(() => {
 
 <Header {isAuthenticated} />
 
+<main>
+    <!-- Sidebar Left -->
+    <div class="sidebar">
+        <h2>Listas de Reproducción</h2>
+        <ul>
+            <li>Favoritos</li>
+            <li>Escuchados Recientemente</li>
+            <li>Biblioteca</li>
+        </ul>
+    </div>
+
+    <!-- Central Content -->
+    <div class="content">
+        <h2>Contenido Dinámico</h2>
+        <p>Aquí aparecerán los resultados de búsquedas o cualquier contenido dinámico que quieras mostrar.</p>
+    </div>
+
+    <!-- Sidebar Right -->
+    <div class="extra">
+        <h2>Información</h2>
+        <ul>
+            <li><a href="/privacy-policy">Política de Privacidad</a></li>
+            <li><a href="https://github.com/turepositorio">Código Fuente</a></li>
+            <li><a href="/cookies">Cookies</a></li>
+            <li><a href="/creator">Creador</a></li>
+        </ul>
+    </div>
+</main>
+
 <main style="padding: 2rem;">
     <h1>Bienvenido a la Página Principal</h1>
     {#if isAuthenticated}
@@ -352,7 +401,6 @@ onMount(() => {
         <p>Por favor, <a href="/login">inicia sesión</a> o <a href="/register">regístrate</a> para continuar.</p>
     {/if}
 </main>
-
 
 <main>
   <h1>Conexión SvelteKit y Node.js</h1>
@@ -395,14 +443,17 @@ onMount(() => {
         <div>{track.title}</div>
         <button on:click={() => playTrack(track.preview)}>Reproducir</button>
 
-        {#if $favorites.find(fav => {
-    console.log("Comparando", fav, "con", track.id); 
-    return fav === track.id;
-})}
-    <button on:click={() => removeFavorite(track.id)}>Eliminar de favoritos</button>
-{:else}
-    <button on:click={() => addFavorite(track.id)}>Agregar a favoritos</button>
+        {#if isAuthenticated}
+  {#if $favorites.find(fav => {
+      console.log("Comparando", fav, "con", track.id); 
+      return fav === track.id;
+  })}
+      <button on:click={() => removeFavorite(track.id)}>Eliminar de favoritos</button>
+  {:else}
+      <button on:click={() => addFavorite(track.id)}>Agregar a favoritos</button>
+  {/if}
 {/if}
+
 
       </div>
     {/each}
