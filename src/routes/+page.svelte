@@ -1,8 +1,9 @@
 <script>
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { favorites, addFavorite, removeFavorite } from '../lib/stores/favorites.js';
     import lodash from 'lodash'; // Cambiado a la importación por defecto
     import { initializeSession, tokenStatus } from '$lib/services/tokenValidation.js';
+    import Carrusel from '$lib/components/Carrusel.svelte';
     const { debounce } = lodash; // Obtener debounce desde lodash
   
     let message = '';
@@ -22,42 +23,28 @@
     }
   
     fetchMessage();
- let tracks = [];
-  let currentIndex = 0;
-  const tracksPerPage = 5;
+
+let tracks = [];
   let loading = true;
 
   async function loadTracks() {
     try {
-      const response = await fetch('http://localhost:5000/api/latest-tracks');
+      const response = await fetch("http://localhost:5000/api/latest-tracks");
       if (!response.ok) {
-        throw new Error('No se pudo obtener las canciones');
+        throw new Error("No se pudo obtener las canciones");
       }
       const data = await response.json();
       tracks = data.data;
-
-      // Establecer un carrusel automático
-      setInterval(() => {
-        currentIndex = (currentIndex + 1) % Math.ceil(tracks.length / tracksPerPage);
-      }, 3000);
-
       loading = false;
     } catch (err) {
-      console.error('Error al obtener las canciones:', err.message);
+      console.error("Error al obtener las canciones:", err.message);
       loading = false;
     }
   }
 
-  loadTracks();
-
-  // Función para dividir canciones en grupos de 5
-  function chunkTracks(tracks, size) {
-    const chunks = [];
-    for (let i = 0; i < tracks.length; i += size) {
-      chunks.push(tracks.slice(i, i + size));
-    }
-    return chunks;
-  }
+  onMount(() => {
+    loadTracks();
+  });
   
   let selectedArtist = null;
   let topTracks = [];
@@ -108,6 +95,8 @@
   };
 
     import Header from '$lib/components/Header.svelte';
+    import { get } from 'svelte/store';
+    import SearchResult from '$lib/components/SearchResult.svelte';
 
     let isAuthenticated = false;
 
@@ -142,20 +131,116 @@
         }
     }
 
+    // Reproducir una canción seleccionada
+  const playTrack = (previewUrl) => {
+    const audio = new Audio(previewUrl);
+    audio.play();
+  };
 
 
 onMount(() => {
   initializeSession();
   obtFavorites();
 })
-  
-// Función para reproducir la canción seleccionada
-  const playTrack = (previewUrl) => {
-    const audio = new Audio(previewUrl);
-    audio.play();
-  };
+
+  let selectedOption = null;
+let favoriteSongs = []; // Lista local para las canciones favoritas
+
+export async function fetchFavoriteSongs() {
+  const token = localStorage.getItem('token');
+  const favoriteIds = get(favorites); // Obtener los IDs de favoritos del writable
+
+  if (!favoriteIds || favoriteIds.length === 0) {
+    console.warn('No hay canciones favoritas almacenadas.');
+    return;
+  }
+
+  try {
+    const response = await fetch('http://localhost:5000/api/userFavorites', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`, // Agrega token si es necesario
+      },
+      body: JSON.stringify({ ids: favoriteIds }), // Envía los IDs al backend
+    });
+
+    if (response.ok) {
+      favoriteSongs = await response.json();
+      favoriteSongs = favoriteSongs.favorites;
+      console.log('Canciones favoritas:', favoriteSongs);
+    } else {
+      const errorData = await response.json();
+      console.error('Error al obtener canciones favoritas:', errorData.error);
+    }
+  } catch (error) {
+    console.error('Error fetching favorite songs:', error.message);
+  }
+}
+
+function handleOptionClick(option) {
+  if (isAuthenticated) {
+    selectedOption = option;
+    if (option === 'Favoritos') {
+      fetchFavoriteSongs(); // Llama a la función para obtener los datos
+    }
+  } else {
+    alert('Por favor, inicia sesión o regístrate para acceder a esta opción.');
+  }
+}
+
+  function goBack() {
+    selectedOption = null;
+  }
+
+  import {showCarrusel} from '$lib/stores/showCarrusel.js';
+    import { resultToShow } from '$lib/stores/resultToShow.js';
+
+     function changeId(newId) {
+        resultToShow.set(newId);
+        showCarrusel.set(false);
+    }
+
+    import { setCurrentSong } from '$lib/stores/songStore.js';
+  import FixedPlayer from '$lib/components/FixedPlayer.svelte'; // Reproductor fijo
+  import { currentSongId } from '$lib/stores/songStore.js';
+    import RecentlyPlayed from '$lib/components/RecentlyPlayed.svelte';
+    import { addRecentlyPlayed } from '$lib/stores/recentlyPlayedStore.js';
+
+  async function handlePlaySong(song) {
+    // Actualiza el `store` localmente
+    addRecentlyPlayed(song);
+
+    // Envía los datos al backend para actualizar el historial en la base de datos
+    try {
+      const response = await fetch("http://localhost:5000/api/recently-played", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          songId: song.id
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al sincronizar con el backend");
+      }
+    } catch (error) {
+      console.error("Error al actualizar el historial en el backend:", error);
+    }
+  }
+
+  import { initializeRecentlyPlayed } from "$lib/stores/recentlyPlayedStore.js";
+
+  // Llama a la función para inicializar el store
+  initializeRecentlyPlayed();
 
 </script>
+
+
+<FixedPlayer />
 
 <style>
 
@@ -164,7 +249,7 @@ onMount(() => {
         grid-template-columns: 20% 1fr 20%;
         gap: 1rem;
         padding: 1rem;
-        height: 100%;
+        height: 65vh;
     }
 
     .sidebar {
@@ -179,26 +264,93 @@ onMount(() => {
     }
 
     .content {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        overflow-y: auto;
+      border: 1px solid white;
     }
 
     .content h2 {
         margin-top: 0;
     }
 
+    /* Contenedor principal de la sección extra */
+.extra {
+    background: rgba(0, 0, 0, 0.8); /* Fondo más oscuro */
+    color: white;
+    padding: 1.5rem;
+    border-radius: 12px; /* Bordes redondeados */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); /* Sombra para profundidad */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden; /* Previene desbordes */
+}
+
+.extra:hover {
+    transform: scale(1.02); /* Aumenta ligeramente el tamaño */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); /* Sombra más intensa */
+}
+
+/* Título de la sección */
+.extra h2 {
+    margin-top: 0;
+    font-size: 1.5rem; /* Tamaño del texto más grande */
+    color: #ff66cc; /* Morado vibrante */
+    border-bottom: 2px solid #ff66cc; /* Línea decorativa */
+    padding-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+/* Lista de enlaces */
+.extra ul {
+    list-style: none; /* Elimina los puntos de lista */
+    padding: 0;
+    margin: 1rem 0 0; /* Separación superior */
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; /* Espaciado entre elementos */
+}
+
+.extra li {
+    margin: 0;
+}
+
+.extra a {
+    color: #ffffff; /* Texto blanco */
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    transition: color 0.3s ease, background-color 0.3s ease, transform 0.2s ease;
+    background-color: rgba(255, 255, 255, 0.1); /* Fondo semi-transparente */
+}
+
+.extra a:hover {
+    color: #1a1a1a; /* Texto negro */
+    background-color: #ff66cc; /* Fondo morado vibrante */
+    transform: scale(1.05); /* Aumenta ligeramente el tamaño */
+    border: 2px solid #ff66cc; /* Borde decorativo */
+}
+
+.extra a:active {
+    transform: scale(0.98); /* Reduce ligeramente el tamaño al hacer clic */
+    background-color: #e055b3; /* Fondo morado más oscuro */
+}
+
+/* Responsive: Espaciado adicional en pantallas pequeñas */
+@media (max-width: 768px) {
     .extra {
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
         padding: 1rem;
-        border-radius: 10px;
     }
 
     .extra h2 {
-        margin-top: 0;
+        font-size: 1.2rem;
     }
+
+    .extra a {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.8rem;
+    }
+}
+
 
     a {
         color: lightblue;
@@ -208,71 +360,10 @@ onMount(() => {
     a:hover {
         text-decoration: underline;
     }
-.carousel-container {
-    position: relative;
-    width: 60rem;
-    overflow: hidden;
-  }
-
-  .carousel {
-    display: flex;
-    transition: transform 0.5s ease;
-  }
-
-  .carousel-item {
-    min-width: 100%;
-    box-sizing: border-box;
-    padding: 20px;
-  }
-
-  .carousel-item img {
-    width: 100%;
-    border-radius: 10px;
-  }
-
-  .carousel-indicators {
-    position: absolute;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    justify-content: center;
-    gap: 5px;
-  }
-
-  .indicator {
-    background-color: white;
-    border-radius: 50%;
-    width: 10px;
-    height: 10px;
-    cursor: pointer;
-    opacity: 0.7;
-  }
-
-  .indicator.active {
-    background-color: #007bff;
-  }
-
-  .skeleton {
-    background-color: #e0e0e0;
-    border-radius: 10px;
-    height: 200px;
-  }
-
-  .skeleton-text {
-    background-color: #e0e0e0;
-    height: 20px;
-    margin-top: 10px;
-    width: 60%;
-    border-radius: 5px;
-  }
-
-  .skeleton-indicator {
-    background-color: #e0e0e0;
-    height: 10px;
-    width: 10px;
-    margin: 0 5px;
-    border-radius: 50%;
+.loading {
+    text-align: center;
+    font-size: 1.5rem;
+    color: gray;
   }
 
 .error { color: red; }
@@ -357,8 +448,209 @@ onMount(() => {
   height: 50px;
   object-fit: cover;
   border-radius: 5px;
+}/* Contenedor principal de la barra lateral */
+.sidebar {
+    padding: 1.5rem; /* Más espacio para un diseño limpio */
+    border: 1px solid #444; /* Borde grafito */
+    background-color: #1a1a1a; /* Fondo negro */
+    border-radius: 12px; /* Bordes redondeados */
+    color: white; /* Texto en blanco */
+    overflow-y: auto;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); /* Sombra para profundidad */
+    transition: transform 0.3s ease, box-shadow 0.3s ease; /* Transición suave */
 }
 
+.sidebar:hover {
+    transform: scale(1.02); /* Aumenta ligeramente el tamaño */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); /* Sombra más intensa */
+}
+
+/* Lista dentro de la barra lateral */
+.sidebar ul {
+    list-style: none; /* Sin viñetas */
+    padding: 0;
+    margin: 1rem 0 0; /* Espaciado superior para separar contenido */
+    display: flex;
+    flex-direction: column; /* Organización vertical */
+    gap: 1rem; /* Espaciado entre elementos */
+}
+
+.sidebar li {
+    margin: 0; /* Elimina margen adicional */
+}
+
+/* Estilo de botones dentro de la barra lateral */
+.sidebar button {
+    width: 100%;
+    padding: 0.75rem 1rem; /* Botones más amplios */
+    border: none;
+    border-radius: 8px; /* Bordes redondeados */
+    cursor: pointer;
+    background-color: #df00da; /* Fondo morado oscuro */
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease; /* Transiciones suaves */
+}
+
+.sidebar button:hover {
+    background-color: #6a0dad; /* Morado más claro */
+    transform: translateY(-2px); /* Desplazamiento hacia arriba */
+    box-shadow: 0 4px 12px rgba(106, 13, 173, 0.6); /* Sombra morada */
+}
+
+.sidebar button:active {
+    background-color: #3a0066; /* Morado más oscuro */
+    transform: translateY(0); /* Vuelve a su posición original */
+    box-shadow: 0 2px 6px rgba(58, 0, 102, 0.6); /* Sombra reducida */
+}
+
+/* Botones deshabilitados */
+.sidebar button[disabled] {
+    background-color: #333; /* Fondo grafito oscuro */
+    color: #aaa; /* Texto gris claro */
+    cursor: not-allowed;
+    opacity: 0.6; /* Más transparencia */
+}
+
+.sidebar button[disabled]:hover {
+    transform: none; /* Sin transformación */
+    box-shadow: none; /* Sin sombra */
+}
+
+/* Scrollbar estilizado */
+.sidebar::-webkit-scrollbar {
+    width: 8px; /* Ancho de la barra de desplazamiento */
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #4b0082; /* Color morado oscuro */
+    border-radius: 4px; /* Bordes redondeados */
+}
+
+/* Títulos dentro de la barra lateral */
+.sidebar h2 {
+    font-size: 1.5rem; /* Tamaño más grande */
+    color: #ff66cc; /* Color morado vibrante */
+    text-transform: uppercase;
+    border-bottom: 2px solid #ff66cc; /* Línea decorativa */
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem; /* Separación del contenido */
+}
+
+/* Enlaces dentro de la barra lateral */
+.sidebar a {
+    color: white; /* Texto blanco */
+    text-decoration: none; /* Sin subrayado */
+    padding: 0.5rem;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.1); /* Fondo semi-transparente */
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+}
+
+.sidebar a:hover {
+    background-color: #ff66cc; /* Fondo morado vibrante */
+    color: #1a1a1a; /* Texto negro */
+    transform: scale(1.05); /* Efecto de aumento */
+}
+
+.sidebar a:active {
+    background-color: #e055b3; /* Morado más oscuro */
+    transform: scale(0.98); /* Reducido ligeramente */
+}
+
+/* Responsividad para pantallas pequeñas */
+@media (max-width: 768px) {
+    .sidebar {
+        padding: 1rem;
+    }
+
+    .sidebar h2 {
+        font-size: 1.2rem;
+    }
+
+    .sidebar button {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.8rem;
+    }
+
+    .sidebar a {
+        font-size: 0.9rem;
+    }
+}
+
+
+  .option-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .song-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 1rem;
+    overflow-x: auto;
+    padding: 1rem 0;
+    font-size: small;
+  }
+
+  .song-row button {
+    all: unset;
+    color: black;
+  }
+
+  .song-card {
+    flex: 0 0 auto;
+    text-align: center;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin: 0.5rem;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .song-card img {
+    width: 100%;          /* Asegúrate de que la imagen ocupe todo el espacio disponible */
+  height: auto;         /* Mantiene la proporción de la imagen */
+  object-fit: cover;    /* Asegura que la imagen cubra el área sin distorsionarse */
+  border-radius: 4px;
+  }
+
+  .song-card h4 {
+    margin: 0.5rem 0 0.2rem;
+    font-size: 0.9rem;
+    color: black;
+  }
+
+  .song-card p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #555;
+  }
+
+  /* Scrollbar styling for the sidebar */
+  .sidebar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+  }
+
+  /* Scrollbar styling for the song row (horizontal scroll) */
+  .song-row::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .song-row::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+  }
 </style>
 
 <Header {isAuthenticated} />
@@ -366,137 +658,143 @@ onMount(() => {
 <main>
     <!-- Sidebar Left -->
     <div class="sidebar">
-        <h2>Listas de Reproducción</h2>
-        <ul>
-            <li>Favoritos</li>
-            <li>Escuchados Recientemente</li>
-            <li>Biblioteca</li>
-        </ul>
-    </div>
-
-    <!-- Central Content -->
-    <div class="content">
-        <h2>Contenido Dinámico</h2>
-        <p>Aquí aparecerán los resultados de búsquedas o cualquier contenido dinámico que quieras mostrar.</p>
-    </div>
-
-    <!-- Sidebar Right -->
-    <div class="extra">
-        <h2>Información</h2>
-        <ul>
-            <li><a href="/privacy-policy">Política de Privacidad</a></li>
-            <li><a href="https://github.com/turepositorio">Código Fuente</a></li>
-            <li><a href="/cookies">Cookies</a></li>
-            <li><a href="/creator">Creador</a></li>
-        </ul>
-    </div>
-</main>
-
-<main style="padding: 2rem;">
-    <h1>Bienvenido a la Página Principal</h1>
-    {#if isAuthenticated}
-    {console.log()}
-        <p>Ya estás autenticado. Accede a las funcionalidades protegidas.</p>
-    {:else}
-        <p>Por favor, <a href="/login">inicia sesión</a> o <a href="/register">regístrate</a> para continuar.</p>
-    {/if}
-</main>
-
-<main>
-  <h1>Conexión SvelteKit y Node.js</h1>
-  <p>{message}</p>
-  
-  <div>
-    <input
-    type="text"
-    bind:value={searchQuery}
-    placeholder="Buscar artistas"
-    class="search-input"
-    />
-    
-    {#if error}
-    <p class="error">{error}</p>
-    {/if}
-    
-    {#if results.length > 0}
-    <div class="results-container">
-      {#each results as artist}
-      <div class="artist-card" on:click={() => handleArtistClick(artist.id)}>
-        <img src={artist.picture_medium || '/placeholder.jpg'} alt={artist.name} />
-            <div class="artist-info">
-              <div class="artist-name">{artist.name}</div>
-              <div class="artist-fans">{artist.nb_fan.toLocaleString()} fans</div>
-            </div>
-          </div>
-        {/each}
-      </div>
-      {:else if searchQuery.trim()}
-      <p>No hay resultados</p>
-      {/if}
-      
-      {#if selectedArtist}
-  <h2>{selectedArtist.name} - Top 10 Canciones</h2>
-  <div class="track-list">
-    {#each topTracks as track}
-      <div class="track-item">
-        <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
-        <div>{track.title}</div>
-        <button on:click={() => playTrack(track.preview)}>Reproducir</button>
-
-        {#if isAuthenticated}
-  {#if $favorites.find(fav => {
-      console.log("Comparando", fav, "con", track.id); 
-      return fav === track.id;
-  })}
-      <button on:click={() => removeFavorite(track.id)}>Eliminar de favoritos</button>
-  {:else}
-      <button on:click={() => addFavorite(track.id)}>Agregar a favoritos</button>
-  {/if}
-{/if}
-
-
-      </div>
-    {/each}
-  </div>
-{/if}
-
-      </div>
-    </main>
-
-    <div class="carousel-container">
-      {#if loading}
-        <!-- Skeleton Loader -->
-        <div class="carousel">
-          {#each Array(tracksPerPage) as _}
-            <div class="carousel-item">
-              <div class="skeleton"></div>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <!-- Carrusel de Canciones -->
-        {#if tracks.length > 0}
-          <div class="carousel" style="transform: translateX(-{currentIndex * 100}%)">
-            {#each chunkTracks(tracks, tracksPerPage) as trackGroup}
-              <div class="carousel-item">
-                {#each trackGroup as track}
-                  <div>
-                    <img src={track.album.cover_medium || '/placeholder.jpg'} alt={track.title} />
-                    <div>{track.title}</div>
+  {#if isAuthenticated}
+    {#if selectedOption}
+      <div>
+        <button on:click={goBack}>Atrás</button>
+        {#if selectedOption === 'Favoritos'}
+          <h3>Favoritos</h3>
+          <div class="song-row">
+            {#if favoriteSongs.length === 0}
+              <p>No tienes favoritos. Empieza buscando lo que te guste</p>
+            {:else}
+              <div>
+                {#each favoriteSongs as song}
+                  <div class="song-card" aria-label="Canción: {song.title}">
+                    <h4>{song.title}</h4>
+                    <img src={song.album.cover_big} alt={song.title} />
+                    <button on:click={() => changeId(song.album.id)}>
+                      <h5 style="color: black; padding: 0; margin: 0">{song.album.title}</h5>
+                    </button>
+                    <button on:click={() => changeId(song.artist.id)}>
+                      <p>{song.artist.name}</p>
+                    </button>
+                    <br>
+                    <button
+                      on:click={() => {
+                        removeFavorite(song.id);
+                        favoriteSongs = favoriteSongs.filter(
+                          (favSong) => favSong.id !== song.id
+                        );
+                      }}
+                    >
+                      Eliminar de favoritos
+                    </button>
+                    <br>
+                    <button on:click={() => setCurrentSong(song)}>Reproducir</button>
                   </div>
                 {/each}
               </div>
-            {/each}
+            {/if}
           </div>
-    
-          <div class="carousel-indicators">
-            {#each Array(Math.ceil(tracks.length / tracksPerPage)) as _, index}
-              <div
-                class="indicator {index === currentIndex ? 'active' : ''}"
-                on:click={() => currentIndex = index}
-              ></div>
-            {/each}
-          </div>
+        {:else if selectedOption === 'Escuchados recientemente'}
+          <!-- Renderiza el componente RecentlyPlayed -->
+          <RecentlyPlayed />
+        {:else}
+          <h3>{selectedOption}</h3>
+          <p>Contenido relacionado con "{selectedOption}".</p>
         {/if}
-      {/if}
-    </div>
+      </div>
+    {:else}
+      <h2>Tu espacio</h2>
+      <ul>
+        <li>
+          <button
+            on:click={() => handleOptionClick('Favoritos')}
+            aria-label="Ver tus canciones favoritas"
+          >
+            Favoritos
+          </button>
+        </li>
+        <li>
+          <button
+            on:click={() => handleOptionClick('Listas de reproducción')}
+            aria-label="Ver tus listas de reproducción"
+          >
+            Listas de reproducción
+          </button>
+        </li>
+        <li>
+          <button
+            on:click={() => handleOptionClick('Escuchados recientemente')}
+            aria-label="Ver tus canciones escuchadas recientemente"
+          >
+            Escuchados recientemente
+          </button>
+        </li>
+      </ul>
+    {/if}
+  {:else}
+    <h2>Inicia sesión o crea una cuenta para acceder a tus:</h2>
+    <ul>
+      <li>
+        <button
+          on:click={handleOptionClick}
+          disabled
+          aria-label="Inicia sesión para ver tus canciones favoritas"
+        >
+          Favoritos
+        </button>
+      </li>
+      <li>
+        <button
+          on:click={handleOptionClick}
+          disabled
+          aria-label="Inicia sesión para ver tus canciones escuchadas recientemente"
+        >
+          Escuchados recientemente
+        </button>
+      </li>
+      <li>
+        <button
+          on:click={handleOptionClick}
+          disabled
+          aria-label="Inicia sesión para ver tu biblioteca"
+        >
+          Biblioteca
+        </button>
+      </li>
+    </ul>
+  {/if}
+</div>
+
+
+
+    <!-- Central Content -->
+    <div class="content">
+    {#if $showCarrusel}
+        <Carrusel {tracks} />
+    {:else}
+        <div style="display: flex; flex-direction: column;">
+            <SearchResult {isAuthenticated}/>
+            <br>
+            <button style="width: 30%; margin: auto;" on:click={() => ($showCarrusel = true)}>
+                Volver
+            </button>
+        </div>
+    {/if}
+</div>
+
+
+    <!-- Sidebar Right -->
+    <div class="extra">
+    <h2>Información</h2>
+    <ul>
+        <li><a href="/privacy-policy">Política de Privacidad</a></li>
+        <li><a href="https://github.com/turepositorio" target="_blank" rel="noopener noreferrer">Código Fuente</a></li>
+        <li><a href="/cookies">Cookies</a></li>
+        <li><a href="/creator">Creador</a></li>
+    </ul>
+</div>
+
+</main>
